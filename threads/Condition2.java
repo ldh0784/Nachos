@@ -32,19 +32,18 @@ public class Condition2 {
      * current thread must hold the associated lock. The thread will
      * automatically reacquire the lock before <tt>sleep()</tt> returns.
      */
-    public void sleep() { // key를 반납하고 wake()를 발생하기 전까지 sleep을 유지시킴
+    public void sleep() {
         Lib.assertTrue(conditionLock.isHeldByCurrentThread());
 
-        boolean intStatus = Machine.interrupt().disable(); // 인터럽트 비활성화하고
-
+        boolean interrupt = Machine.interrupt().disable(); // 인터럽트를 disable시킴
         waitQueue.add(KThread.currentThread()); // 현재 스레드를 대기 큐에 추가하고
+
         conditionLock.release();
 
         KThread.currentThread().sleep();
 
         conditionLock.acquire();
-
-        Machine.interrupt().restore(intStatus); // 인터럽트를 복원시킴
+        Machine.interrupt().restore(interrupt); // disable된 인터럽트를 restore
     }
 
     /**
@@ -53,13 +52,13 @@ public class Condition2 {
      */
     public void wake() {
         Lib.assertTrue(conditionLock.isHeldByCurrentThread());
-
-        boolean intStatus = Machine.interrupt().disable(); // 인터럽트 비활성화
-        if(!waitQueue.isEmpty()){ // 대기큐에 쓰레드가 들어 있으면
-            KThread thread = waitQueue.removeFirst(); // 가장 앞의 쓰레드를 깨워서
-            thread.ready(); // 스레드를 ready 상태로 만듦
+        if(!waitQueue.isEmpty()){ // waitQueue가 비어있지 않다면 즉, thread가 들어있다면
+            boolean interrupt = Machine.interrupt().disable(); // 인터럽트를 disable시킴
+            KThread wakeThread = new KThread();
+            wakeThread = (KThread) waitQueue.removeFirst(); // waitQueue의 맨 앞 쓰레드를 꺼낸 다음,
+            wakeThread.ready(); // 꺼낸 쓰레드를 ready 상태로 만듦
+            Machine.interrupt().restore(interrupt); // disable된 인터럽트를 restore
         }
-        Machine.interrupt().restore(intStatus); // 인터럽트를 복원시킴
     }
 
     /**
@@ -68,12 +67,9 @@ public class Condition2 {
      */
     public void wakeAll() {
         Lib.assertTrue(conditionLock.isHeldByCurrentThread());
-        boolean intStatus = Machine.interrupt().disable();
         while (!waitQueue.isEmpty()) {
-            KThread thread = waitQueue.removeFirst();
-            thread.ready();
+            wake();
         }
-        Machine.interrupt().restore(intStatus);
     }
 
     private Lock conditionLock;
